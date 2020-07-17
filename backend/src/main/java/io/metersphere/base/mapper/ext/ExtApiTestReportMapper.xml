@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="io.metersphere.base.mapper.ext.ExtApiTestReportMapper">
+
+    <resultMap id="BaseResultMap" type="io.metersphere.api.dto.APIReportResult"
+               extends="io.metersphere.base.mapper.ApiTestReportMapper.BaseResultMap">
+        <result column="test_name" property="testName"/>
+        <result column="project_name" property="projectName"/>
+        <result column="user_name" property="userName"/>
+    </resultMap>
+
+    <select id="list" resultMap="BaseResultMap">
+        SELECT t.name AS test_name,
+        r.name, r.description, r.id, r.test_id, r.create_time, r.update_time, r.status,
+        project.name AS project_name, user.name AS user_name
+        FROM api_test_report r JOIN api_test t ON r.test_id = t.id
+        LEFT JOIN project ON project.id = t.project_id
+        LEFT JOIN user ON user.id = r.user_id
+        <where>
+            <if test="request.name != null">
+                AND r.name like CONCAT('%', #{request.name},'%')
+            </if>
+            <if test="request.projectId != null">
+                AND project.id = #{request.projectId}
+            </if>
+            <if test="request.workspaceId != null">
+                AND project.workspace_id = #{request.workspaceId,jdbcType=VARCHAR}
+            </if>
+            <if test="request.filters != null and request.filters.size() > 0">
+                <foreach collection="request.filters.entrySet()" index="key" item="values">
+                    <if test="values != null and values.size() > 0">
+                        and r.${key} in
+                        <foreach collection="values" item="value" separator="," open="(" close=")">
+                            #{value}
+                        </foreach>
+                    </if>
+                </foreach>
+            </if>
+        </where>
+        <if test="request.orders != null and request.orders.size() > 0">
+            order by
+            <foreach collection="request.orders" separator="," item="order">
+                r.${order.name} ${order.type}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="listByTestId" resultMap="BaseResultMap">
+        SELECT t.name AS test_name,
+        r.name, r.description, r.id, r.test_id, r.create_time, r.update_time, r.status,
+        project.name AS project_name, user.name AS user_name
+        FROM api_test_report r JOIN api_test t ON r.test_id = t.id
+        LEFT JOIN project ON project.id = t.project_id
+        LEFT JOIN user ON user.id = r.user_id
+        <where>
+            r.test_id = #{testId}
+        </where>
+        ORDER BY r.update_time DESC
+    </select>
+
+    <select id="get" resultMap="BaseResultMap">
+        SELECT r.*, t.name AS test_name, project.name AS project_name, user.name AS user_name
+        FROM api_test_report r JOIN api_test t ON r.test_id = t.id
+        LEFT JOIN project ON project.id = t.project_id
+        LEFT JOIN user ON user.id = r.user_id
+        <where>
+            r.id = #{id}
+        </where>
+        ORDER BY r.update_time DESC
+    </select>
+
+    <select id="selectDashboardTests" resultType="io.metersphere.dto.DashboardTestDTO">
+        SELECT create_time AS date, count(api_test_report.id) AS count,
+        date_format(from_unixtime(create_time / 1000), '%Y-%m-%d') AS x
+        FROM api_test_report
+        WHERE test_id IN (SELECT api_test.id
+        FROM api_test
+        JOIN project ON api_test.project_id = project.id
+        WHERE workspace_id = #{workspaceId,jdbcType=VARCHAR})
+        AND create_time > #{startTimestamp}
+        GROUP BY x
+    </select>
+
+</mapper>

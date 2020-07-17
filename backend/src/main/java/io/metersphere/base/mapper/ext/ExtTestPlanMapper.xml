@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="io.metersphere.base.mapper.ext.ExtTestPlanMapper">
+
+    <resultMap id="BaseResultMap" type="io.metersphere.track.dto.TestPlanDTO"
+               extends="io.metersphere.base.mapper.TestPlanMapper.BaseResultMap">
+        <result column="project_name" property="projectName"/>
+    </resultMap>
+
+    <select id="list" resultMap="BaseResultMap" parameterType="io.metersphere.track.request.testcase.QueryTestPlanRequest">
+        select test_plan.*, project.name as project_name
+        from test_plan
+        left join project on test_plan.project_id = project.id
+        <where>
+            <if test="request.name != null">
+                and test_plan.name like CONCAT('%', #{request.name},'%')
+            </if>
+            <if test="request.workspaceId != null">
+                AND project.workspace_id = #{request.workspaceId}
+            </if>
+            <if test="request.projectId != null">
+                AND project.id = #{request.projectId}
+            </if>
+            <if test="request.id != null">
+                AND test_plan.id = #{request.id}
+            </if>
+            <if test="request.filters != null and request.filters.size() > 0">
+                <foreach collection="request.filters.entrySet()" index="key" item="values">
+                    <if test="values != null and values.size() > 0">
+                        and ${key} in
+                        <foreach collection="values" item="value" separator="," open="(" close=")">
+                            #{value}
+                        </foreach>
+                    </if>
+                </foreach>
+            </if>
+        </where>
+        <if test="request.orders != null and request.orders.size() > 0">
+            order by
+            <foreach collection="request.orders" separator="," item="order">
+                test_plan.${order.name} ${order.type}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="listRelate" resultType="io.metersphere.track.dto.TestPlanDTOWithMetric">
+        select test_plan.*, project.name as project_name
+        from test_plan
+        left join project on test_plan.project_id = project.id
+        where test_plan.workspace_id = #{request.workspaceId}
+        and (test_plan.principal = #{request.principal}
+        <if test="request.planIds != null and request.planIds.size() > 0">
+            or test_plan.id in 
+            <foreach collection="request.planIds" item="planId" open="(" close=")" separator=",">
+                #{planId}
+            </foreach>
+        </if>
+        )
+        order by test_plan.update_time desc
+    </select>
+</mapper>
